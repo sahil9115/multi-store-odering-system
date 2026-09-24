@@ -1,0 +1,55 @@
+<?php
+
+namespace Tests\Feature\Auth;
+
+use App\Enums\UserRole;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Volt\Volt;
+use Tests\TestCase;
+
+class RegistrationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_registration_screen_can_be_rendered(): void
+    {
+        $response = $this->get('/register');
+
+        $response
+            ->assertOk()
+            ->assertSeeVolt('pages.auth.register');
+    }
+
+    public function test_new_users_can_register(): void
+    {
+        $component = Volt::test('pages.auth.register')
+            ->set('name', 'Test User')
+            ->set('email', 'test@example.com')
+            ->set('password', 'password')
+            ->set('password_confirmation', 'password');
+
+        $component->call('register');
+
+        $component->assertRedirect(route('dashboard', absolute: false));
+
+        $this->assertAuthenticated();
+        $this->assertTrue($this->app['auth']->user()->hasRole(UserRole::Customer->value));
+    }
+
+    public function test_registration_is_rejected_for_a_duplicate_email(): void
+    {
+        User::factory()->create(['email' => 'test@example.com']);
+
+        $component = Volt::test('pages.auth.register')
+            ->set('name', 'Test User')
+            ->set('email', 'test@example.com')
+            ->set('password', 'password')
+            ->set('password_confirmation', 'password');
+
+        $component->call('register');
+
+        $component->assertHasErrors(['email']);
+        $this->assertGuest();
+    }
+}
